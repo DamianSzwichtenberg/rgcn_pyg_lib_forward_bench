@@ -23,6 +23,7 @@ import torch
 from torch_geometric.data import Data, HeteroData, InMemoryDataset
 from torch_geometric.utils import coalesce, remove_self_loops, to_undirected
 
+
 class FakeHeteroDataset(InMemoryDataset):
     r"""A fake dataset that returns randomly generated
     :class:`~torch_geometric.data.HeteroData` objects.
@@ -148,10 +149,6 @@ class FakeHeteroDataset(InMemoryDataset):
         return data
 
 
-
-###############################################################################
-
-
 def get_num_nodes(avg_num_nodes: int, avg_degree: int) -> int:
     min_num_nodes = max(3 * avg_num_nodes // 4, avg_degree)
     max_num_nodes = 5 * avg_num_nodes // 4
@@ -182,7 +179,11 @@ def get_edge_index(num_src_nodes: int, num_dst_nodes: int, avg_degree: int,
         edge_index = coalesce(edge_index, num_nodes=num_nodes)
 
     return edge_index
+
+
 from pyg_lib_heterolinear import HeteroLinear
+
+
 def fuse_data(batch, device):
     x_dict = batch.collect('x')
     x = torch.cat(list(x_dict.values()), dim=0)
@@ -191,9 +192,11 @@ def fuse_data(batch, device):
         type_vec_list.append(torch.ones(x_dict[node_type].shape[0]) * i)
     return x.to(device), torch.cat(type_vec_list).to(device).to(torch.long)
 
+
 def get_fresh_data(num_node_types):
     torch_geometric.seed_everything(42)
     return FakeHeteroDataset(avg_num_nodes=20000, num_node_types=num_node_types, num_edge_types=128).data
+
 
 def train(num_node_types, device='cpu', lib=False):
     torch.cuda.empty_cache()
@@ -221,22 +224,19 @@ def train(num_node_types, device='cpu', lib=False):
             sumtime += time.time() - since
     return forward_sumtime/95.0, sumtime/95.0
 
-fwd_p_bwd_times = {'cpu':[], 'gpu':[], 'pyg_lib':[]}
-for num_node_types in [4, 8, 16, 32, 64, 128, 256, 512, 1024]:
+
+fwd_p_bwd_times = {'pyg_cpu':[], 'pyg_lib_cpu':[]}
+for num_node_types in [4, 8, 16, 32, 64, 128, 256, 512]:
     try:
         print("Timing num_node_types=", str(num_node_types) + str('...'))
-        print('Timing pyg_lib...')
-        avg_fwd, avg_bwd = train(num_node_types, device='cuda', lib=True)
+        print('Timing pyg_lib_cpu...')
+        avg_fwd, avg_bwd = train(num_node_types, lib=True)
         print("Fwd+bwd time=", avg_fwd+avg_bwd)
-        fwd_p_bwd_times['pyg_lib'].append(avg_fwd+avg_bwd)
-        print('Timing vanilla gpu...')
-        avg_fwd, avg_bwd = train(num_node_types, device='cuda')
-        print("Fwd+bwd time=", avg_fwd+avg_bwd)
-        fwd_p_bwd_times['gpu'].append(avg_fwd+avg_bwd)
-        print('Timing cpu...')
+        fwd_p_bwd_times['pyg_lib_cpu'].append(avg_fwd+avg_bwd)
+        print('Timing pyg_cpu...')
         avg_fwd, avg_bwd = train(num_node_types)
         print("Fwd+bwd time=", avg_fwd+avg_bwd)
-        fwd_p_bwd_times['cpu'].append(avg_fwd+avg_bwd)
+        fwd_p_bwd_times['pyg_cpu'].append(avg_fwd+avg_bwd)
     except:
         print("Forward plus Backward Times:", fwd_p_bwd_times)
         quit()
@@ -244,6 +244,4 @@ for num_node_types in [4, 8, 16, 32, 64, 128, 256, 512, 1024]:
 
 
 print("Forward plus Backward Times:", fwd_p_bwd_times)
-
-
 
